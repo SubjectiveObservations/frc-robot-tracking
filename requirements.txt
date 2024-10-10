@@ -3,5 +3,6 @@ numpy
 pandas
 supervision
 python-dotenv
+argparse
 # tba-api-v3client
 # ultralytics

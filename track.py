@@ -8,13 +8,27 @@ from inference.models.utils import get_roboflow_model
 load_dotenv()
 
 model = get_roboflow_model(model_id="frc-scouting-application/2", api_key=os.getenv('ROBOFLOW_API_KEY'))
-tracker = sv.ByteTrack()
-box_annotator = sv.BoxAnnotator()
-label_annotator = sv.LabelAnnotator()
-trace_annotator = sv.TraceAnnotator()
-
 video_info = sv.VideoInfo.from_video_path(video_path="video.mp4")
 frames_generator = sv.get_video_frames_generator(source_path='video.mp4')
+tracker = sv.ByteTrack(frame_rate=video_info.fps)  # initiates tracker
+
+thickness = sv.calculate_optimal_line_thickness(resolution_wh=video_info.resolution_wh)
+text_scale = sv.calculate_optimal_text_scale(
+    resolution_wh=video_info.resolution_wh)
+# calculates optimal text scale and thickness for labels and other annotators
+
+box_annotator = sv.BoxAnnotator(thickness=thickness)
+label_annotator = sv.LabelAnnotator(
+    text_scale=text_scale,
+    text_thickness=thickness,
+    color_lookup=sv.ColorLookup.TRACK,
+)
+trace_annotator = sv.TraceAnnotator(
+    thickness=thickness,
+    trace_length=video_info.fps,
+    color_lookup=sv.ColorLookup.TRACK,
+)
+# initiates all annotators
 
 def callback(frame: np.ndarray, _: int) -> np.ndarray:
     results = model.infer(frame)[0]

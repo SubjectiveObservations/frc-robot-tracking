@@ -13,8 +13,9 @@ This project aims to track and analyse robots in FIRST Robotics Competition (FRC
 
 - Robot detection and tracking in FRC match videos
 - Heatmap generation to visualise robot movement patterns
-- Velocity and acceleration measurement (WIP, the velocity and acceleration measurements in `bytrack.py` are currently inaccurate due to skewing problems.)
+- Velocity and acceleration measurement (WIP, the velocity and acceleration measurements in `bytrack.py` are currently inaccurate due to noise problems.)
 - Integration with FRC API and The Blue Alliance API for scoring data analysis (planned)
+- Integration to write and read csv files for every instance of detections (planned)
 
 ## Requirements
 
@@ -55,7 +56,7 @@ This project aims to track and analyse robots in FIRST Robotics Competition (FRC
 
 To track robots in a video:
 ```bash
-python bytetrack.py
+python track.py
 ```
 
 This script uses box annotator, trace annotator, and label annotator to mark detected robots in the video.
@@ -72,7 +73,7 @@ This script analyses the file "video.mp4" and produces a heatmap visualisation o
 
 ### Velocity and Acceleration Measurement
 
-Note: This feature is currently under development and **does not** produce accurate results due to skewing issues.
+Note: This feature is currently under development and **does not** produce accurate results due to noise issues.
 
 ```bash
 python bytrack.py
