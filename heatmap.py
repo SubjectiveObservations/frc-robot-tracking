@@ -1,10 +1,9 @@
 import supervision as sv
-from ultralytics import YOLO
+from inference.models.utils import get_roboflow_model
 
-#import os
-#load_dotenv()
-#model = get_roboflow_model(model_id="frc-scouting-application/2", api_key=os.getenv('ROBOFLOW_API_KEY'))
-model = YOLO("yolo11n.pt")
+import os
+load_dotenv()
+model = get_roboflow_model(model_id="frc-scouting-application/2", api_key=os.getenv('ROBOFLOW_API_KEY'))
 heat_map_annotator = sv.HeatMapAnnotator()
 
 video_info = sv.VideoInfo.from_video_path(video_path='video.mp4')

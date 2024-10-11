@@ -51,6 +51,7 @@ Thumbs.db
 *~
 result*.mp4
 *.csv
+*.gif
 
 # Ultralytics
 *.pt

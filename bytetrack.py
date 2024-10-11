@@ -1,12 +1,13 @@
 import os
-
-import argparse
 from collections import defaultdict, deque
 
-import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 import supervision as sv
+from dotenv import load_dotenv
 from inference.models.utils import get_roboflow_model
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 load_dotenv()
 
@@ -54,22 +55,56 @@ class ViewTransformer:
         target = target.astype(np.float32)  # ensures np arrays are in float32 format for opencv library
         self.m = cv2.getPerspectiveTransform(source, target)
 
+#Takes two arrays of points, source and target, and calculates the perspective transformation matrix self.m using OpenCV’s cv2.getPerspectiveTransform function.
+
     def transform_points(self, points: np.ndarray) -> np.ndarray:
         if points.size == 0:
+# Takes an array of points, checks if the array is empty, and then applies the perspective transformation using cv2.perspectiveTransform function, transforming the points from the source perspective to the target perspective. The transformed points are then reshaped back into the original format.
             return points
 
         reshaped_points = points.reshape(-1, 1, 2).astype(np.float32)
         transformed_points = cv2.perspectiveTransform(reshaped_points, self.m)
         return transformed_points.reshape(-1, 2)  # removes third dimension
 
+class PointTracker:
+    def __init__(self, coordinates):
+        self.coordinates = coordinates
+
+    def save_path_as_gif(self, filename='points_path1.gif', fps=10):
+        fig, ax = plt.subplots()
+        all_x = [x for points in self.coordinates.values() for x, y in points]
+        all_y = [y for points in self.coordinates.values() for x, y in points]
+        ax.set_xlim(min(all_x) - 1, max(all_x) + 1)
+        ax.set_ylim(min(all_y) - 1, max(all_y) + 1)
+        points_plot, = ax.plot([], [], 'bo')
+        path_lines = {key: ax.plot([], [], 'r--', linewidth=0.5)[0] for key in self.coordinates.keys()}
+
+        def init():
+            points_plot.set_data([], [])
+            for path_line in path_lines.values():
+                path_line.set_data([], [])
+            return points_plot, *path_lines.values()
+
+        def update(frame):
+            all_points = []
+            for key, points in self.coordinates.items():
+                if len(points) > frame:
+                    x, y = points[frame]
+                    all_points.append((x, y))
+                    path_lines[key].set_data([p[0] for p in list(points)[:frame+1]], [p[1] for p in list(points)[:frame+1]])
+            if all_points:
+                points_plot.set_data([p[0] for p in all_points], [p[1] for p in all_points])
+            return points_plot, *path_lines.values()
+
+        ani = FuncAnimation(fig, update, frames=max(len(points) for points in self.coordinates.values()), init_func=init, blit=True)
+        ani.save(filename, writer=PillowWriter(fps=fps))
 
 polygon_zone = sv.PolygonZone(SOURCE)
 view_transformer = ViewTransformer(source=SOURCE, target=TARGET)
 
 coordinates = defaultdict(lambda: deque(maxlen=video_info.fps))  # keeps dictionary of historical point movement
 
-
-def callback(frame: np.ndarray, _: int) -> np.ndarray:
+def callback(frame: np.ndarray, frame_idx: int) -> np.ndarray:
     #function for callback to initiate frame analysis and prediction
     results = model.infer(frame)[0]
     detections = sv.Detections.from_inference(results)
@@ -80,14 +115,20 @@ def callback(frame: np.ndarray, _: int) -> np.ndarray:
         anchor=sv.Position.BOTTOM_CENTER)
     points = view_transformer.transform_points(points=points).astype(int)  # relates points to distance
 
+    for tracker_id, point in zip(detections.tracker_id, points):
+        coordinates[tracker_id].append(point)
+    
     labels = []  # sets an empty label array
     for tracker_id in detections.tracker_id:
-        coordinate_start = coordinates[tracker_id][-1]
-        coordinate_end = coordinates[tracker_id][0]
-        distance = abs(coordinate_start - coordinate_end)
-        time = len(coordinates[tracker_id]) / video_info.fps
-        speed = distance / time
-        labels.append(f"#{tracker_id} {int(speed)}")
+        if len(coordinates[tracker_id]) > 1:
+            coordinate_start = coordinates[tracker_id][0]
+            coordinate_end = coordinates[tracker_id][-1]
+            distance = np.linalg.norm(coordinate_end - coordinate_start)
+            time = len(coordinates[tracker_id]) / video_info.fps
+            speed = distance / time
+            labels.append(f"#{tracker_id} {int(speed)} ms^-1")
+        else:
+            labels.append(f"#{tracker_id}")
         # if len(coordinates[tracker_id]) < video_info.fps / 2:
         #     labels.append(f"#{tracker_id}")  # if there is not enough distance travelled, display only the track id
         # else:
@@ -100,7 +141,7 @@ def callback(frame: np.ndarray, _: int) -> np.ndarray:
 
     #with sv.CSVSink("tracking_results11.csv") as sink:
         #sink.append(detections, {})
-
+    
     annotated_frame = box_annotator.annotate(
         frame.copy(), detections=detections)
     annotated_frame = label_annotator.annotate(
@@ -114,3 +155,6 @@ sv.process_video(
     target_path="resultc12.mp4",
     callback=callback
 )
+
+tracker = PointTracker(coordinates)
+tracker.save_path_as_gif(filename='tracking_path.gif', fps=video_info.fps)

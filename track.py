@@ -36,8 +36,8 @@ def callback(frame: np.ndarray, _: int) -> np.ndarray:
     detections = tracker.update_with_detections(detections)
     
     labels = [
-        f"#{tracker_id} {class_id}"
-        for class_id, tracker_id
+        f"#{tracker_id}"
+        for tracker_id
         in zip(detections.class_id, detections.tracker_id)
     ]
 
