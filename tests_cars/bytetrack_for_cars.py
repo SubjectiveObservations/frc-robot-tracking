@@ -12,10 +12,10 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 load_dotenv()
 
-#SOURCE = np.array([[1252, 787], [2298, 803], [5039, 2159], [-550, 2159]])
-SOURCE = np.array([[387, 287], [1454, 260], [1908, 537], [-82, 595]])  # array of coordinates of field plane
-TARGET_WIDTH = 16.59128
-TARGET_HEIGHT = 8.211312
+SOURCE = np.array([[1252, 787], [2298, 803], [5039, 2159], [-550, 2159]])
+
+TARGET_WIDTH = 25
+TARGET_HEIGHT = 250
 
 TARGET = np.array(
     [
@@ -26,9 +26,9 @@ TARGET = np.array(
     ]
 )  # array of coordinates of the target plane
 
-model = get_roboflow_model(model_id="frc-scouting-application/2", api_key=os.getenv('ROBOFLOW_API_KEY'))
-video_info = sv.VideoInfo.from_video_path(video_path="video.mp4")
-frames_generator = sv.get_video_frames_generator(source_path='video.mp4')
+model = get_roboflow_model(model_id="yolov8x-640", api_key=os.getenv('ROBOFLOW_API_KEY'))
+video_info = sv.VideoInfo.from_video_path(video_path="vehicles.mp4")
+frames_generator = sv.get_video_frames_generator(source_path='vehicles.mp4')
 tracker = sv.ByteTrack(frame_rate=video_info.fps)  # initiates tracker
 
 thickness = sv.calculate_optimal_line_thickness(resolution_wh=video_info.resolution_wh)
@@ -122,12 +122,15 @@ with sv.VideoSink(target_path="result.mp4", video_info=video_info) as sink:
         
         labels = []  # sets an empty label array
         for tracker_id in detections.tracker_id:
-            coordinate_start = coordinates[tracker_id][-1]
-            coordinate_end = coordinates[tracker_id][0]
-            distance = abs(coordinate_start - coordinate_end)
-            time = len(coordinates[tracker_id]) / video_info.fps
-            speed = distance / time
-            labels.append(f"#{tracker_id} {int(speed)} ms^-1")
+            if len(coordinates[tracker_id]) < video_info.fps / 2:
+                labels.append(f"#{tracker_id}")
+            else:
+                coordinate_start = coordinates[tracker_id][-1]
+                coordinate_end = coordinates[tracker_id][0]
+                distance = abs(coordinate_start - coordinate_end)
+                time = len(coordinates[tracker_id]) / video_info.fps
+                speed = np.linalg.norm(distance) / time
+                labels.append(f"#{tracker_id} {int(speed)} ms^-1")
 
         annotated_frame = frame.copy()
         annotated_frame = trace_annotator.annotate(
@@ -143,4 +146,4 @@ with sv.VideoSink(target_path="result.mp4", video_info=video_info) as sink:
         sink.write_frame(frame=annotated_frame)
 
 tracker = PointTracker(coordinates)
-tracker.save_path_as_gif(filename='tracking_path1.gif', fps=video_info.fps)
+tracker.save_path_as_gif(filename='tracking_path_cars.gif', fps=video_info.fps)

@@ -26,7 +26,7 @@ TARGET = np.array(
     ]
 )  # array of coordinates of the target plane
 
-model = get_roboflow_model(model_id="frc-scouting-application/2", api_key=os.getenv('ROBOFLOW_API_KEY'))
+model = get_roboflow_model(model_id="frc-scouting-application/3", api_key=os.getenv('ROBOFLOW_API_KEY'))
 video_info = sv.VideoInfo.from_video_path(video_path="video.mp4")
 frames_generator = sv.get_video_frames_generator(source_path='video.mp4')
 tracker = sv.ByteTrack(frame_rate=video_info.fps)  # initiates tracker
@@ -106,41 +106,57 @@ view_transformer = ViewTransformer(source=SOURCE, target=TARGET)
 
 coordinates = defaultdict(lambda: deque(maxlen=video_info.fps))  # keeps dictionary of historical point movement
 
-with sv.VideoSink(target_path="result.mp4", video_info=video_info) as sink:
-    for frame in frames_generator:
-        result = model.infer(frame)[0]
-        detections = sv.Detections.from_inference(result)
-        detections = detections[polygon_zone.trigger(detections)]  # restricts detections to polygon zone
-        detections = tracker.update_with_detections(detections)  # associates trackers
+def callback(frame: np.ndarray, frame_idx: int) -> np.ndarray:
+    #function for callback to initiate frame analysis and prediction
+    results = model.infer(frame)[0]
+    detections = sv.Detections.from_inference(results)
+    detections = detections[polygon_zone.trigger(detections)]  # restricts detections to polygon zone
+    detections = tracker.update_with_detections(detections)  # associates trackers
 
-        points = detections.get_anchors_coordinates(
-            anchor=sv.Position.BOTTOM_CENTER)
-        points = view_transformer.transform_points(points=points).astype(int)
+    points = detections.get_anchors_coordinates(
+        anchor=sv.Position.BOTTOM_CENTER)
+    points = view_transformer.transform_points(points=points).astype(int)  # relates points to distance
 
-        for tracker_id, point in zip(detections.tracker_id, points):
-            coordinates[tracker_id].append(point)
-        
-        labels = []  # sets an empty label array
-        for tracker_id in detections.tracker_id:
+    for tracker_id, point in zip(detections.tracker_id, points):
+        coordinates[tracker_id].append(point)
+    
+    labels = []  # sets an empty label array
+    for tracker_id in detections.tracker_id:
+        if len(coordinates[tracker_id]) > 1:
             coordinate_start = coordinates[tracker_id][-1]
             coordinate_end = coordinates[tracker_id][0]
             distance = abs(coordinate_start - coordinate_end)
             time = len(coordinates[tracker_id]) / video_info.fps
-            speed = distance / time
+            speed = np.linalg.norm(distance) / time
             labels.append(f"#{tracker_id} {int(speed)} ms^-1")
+        else:
+            labels.append(f"#{tracker_id}")
+        # if len(coordinates[tracker_id]) < video_info.fps / 2:
+        #     labels.append(f"#{tracker_id}")  # if there is not enough distance travelled, display only the track id
+        # else:
+        #     coordinate_start = coordinates[tracker_id][-1]
+        #     coordinate_end = coordinates[tracker_id][0]
+        #     distance = abs(coordinate_start - coordinate_end)
+        #     time = len(coordinates[tracker_id]) / video_info.fps
+        #     speed = distance / time
+        #     labels.append(f"#{tracker_id} {int(speed)}")  # display otherwise
 
-        annotated_frame = frame.copy()
-        annotated_frame = trace_annotator.annotate(
-            scene=annotated_frame, detections=detections
-        )
-        annotated_frame = box_annotator.annotate(
-            scene=annotated_frame, detections=detections
-        )
-        annotated_frame = label_annotator.annotate(
-            scene=annotated_frame, detections=detections, labels=labels
-        )
-        
-        sink.write_frame(frame=annotated_frame)
+    #with sv.CSVSink("tracking_results11.csv") as sink:
+        #sink.append(detections, {})
+    
+    annotated_frame = box_annotator.annotate(
+        frame.copy(), detections=detections)
+    annotated_frame = label_annotator.annotate(
+        annotated_frame, detections=detections, labels=labels)
+    annotated_frame = sv.draw_polygon(annotated_frame, polygon=SOURCE, color=sv.Color.RED)
+    return trace_annotator.annotate(
+        annotated_frame, detections=detections)  # adds all annotators to bounding box and scene
+
+sv.process_video(
+    source_path="video.mp4",
+    target_path="result1.mp4",
+    callback=callback
+)
 
 tracker = PointTracker(coordinates)
 tracker.save_path_as_gif(filename='tracking_path1.gif', fps=video_info.fps)

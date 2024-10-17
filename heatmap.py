@@ -1,5 +1,6 @@
 import supervision as sv
 from inference.models.utils import get_roboflow_model
+from dotenv import load_dotenv
 
 import os
 load_dotenv()
