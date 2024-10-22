@@ -14,8 +14,8 @@ load_dotenv()
 
 #SOURCE = np.array([[1252, 787], [2298, 803], [5039, 2159], [-550, 2159]])
 SOURCE = np.array([[387, 287], [1454, 260], [1908, 537], [-82, 595]])  # array of coordinates of field plane
-TARGET_WIDTH = 16.59128
-TARGET_HEIGHT = 8.211312
+TARGET_WIDTH = 16591.28
+TARGET_HEIGHT = 8211.312
 
 TARGET = np.array(
     [
@@ -72,7 +72,7 @@ class PointTracker:
         self.coordinates = coordinates
         self.colors = {key: (random.random(), random.random(), random.random()) for key in coordinates.keys()}
 
-    def save_path_as_gif(self, filename='tracking_path1.gif', fps=30):
+    def save_path_as_gif(self, filename='tracking_path3.gif', fps=30):
         fig, ax = plt.subplots()
         all_x = [x for points in self.coordinates.values() for x, y in points]
         all_y = [y for points in self.coordinates.values() for x, y in points]
@@ -127,8 +127,8 @@ def callback(frame: np.ndarray, frame_idx: int) -> np.ndarray:
             coordinate_end = coordinates[tracker_id][0]
             distance = abs(coordinate_start - coordinate_end)
             time = len(coordinates[tracker_id]) / video_info.fps
-            speed = np.linalg.norm(distance) / time
-            labels.append(f"#{tracker_id} {int(speed)} ms^-1")
+            speed = np.linalg.norm(distance) / (time * 1000)
+            labels.append(f"#{tracker_id} {float(speed)} ms^-1")
         else:
             labels.append(f"#{tracker_id}")
         # if len(coordinates[tracker_id]) < video_info.fps / 2:
@@ -154,9 +154,9 @@ def callback(frame: np.ndarray, frame_idx: int) -> np.ndarray:
 
 sv.process_video(
     source_path="video.mp4",
-    target_path="result1.mp4",
+    target_path="result2.mp4",
     callback=callback
 )
 
 tracker = PointTracker(coordinates)
-tracker.save_path_as_gif(filename='tracking_path1.gif', fps=video_info.fps)
+tracker.save_path_as_gif(filename='tracking_path3.gif', fps=video_info.fps)
