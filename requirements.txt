@@ -3,4 +3,7 @@ numpy
 pandas
 supervision
 python-dotenv
+opencv-python
+matplotlib
+python-dotenv
 # tba-api-v3client

@@ -106,7 +106,7 @@ view_transformer = ViewTransformer(source=SOURCE, target=TARGET)
 
 coordinates = defaultdict(lambda: deque(maxlen=video_info.fps))  # keeps dictionary of historical point movement
 
-with sv.VideoSink(target_path="result.mp4", video_info=video_info) as sink:
+with sv.VideoSink(target_path="result1.mp4", video_info=video_info) as sink:
     for frame in frames_generator:
         result = model.infer(frame)[0]
         detections = sv.Detections.from_inference(result)
@@ -146,4 +146,4 @@ with sv.VideoSink(target_path="result.mp4", video_info=video_info) as sink:
         sink.write_frame(frame=annotated_frame)
 
 tracker = PointTracker(coordinates)
-tracker.save_path_as_gif(filename='tracking_path_cars.gif', fps=video_info.fps)
+tracker.save_path_as_gif(filename='tracking_path_cars1.gif', fps=video_info.fps)

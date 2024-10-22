@@ -28,6 +28,7 @@ wheels/
 
 # Virtual environments
 venv/
+.venv/
 env/
 .env
 
@@ -49,7 +50,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
-result*.mp4
+*.mp4
 *.csv
 *.gif
 

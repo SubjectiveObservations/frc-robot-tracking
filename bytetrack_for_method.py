@@ -14,8 +14,8 @@ load_dotenv()
 
 #SOURCE = np.array([[1252, 787], [2298, 803], [5039, 2159], [-550, 2159]])
 SOURCE = np.array([[387, 287], [1454, 260], [1908, 537], [-82, 595]])  # array of coordinates of field plane
-TARGET_WIDTH = 16.59128
-TARGET_HEIGHT = 8.211312
+TARGET_WIDTH = 16591.28
+TARGET_HEIGHT = 8211.312
 
 TARGET = np.array(
     [

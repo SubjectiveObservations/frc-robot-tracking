@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict, deque
 
-import matplotlib.colors as mcolors
+import random
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,8 +14,8 @@ load_dotenv()
 
 #SOURCE = np.array([[1252, 787], [2298, 803], [5039, 2159], [-550, 2159]])
 SOURCE = np.array([[387, 287], [1454, 260], [1908, 537], [-82, 595]])  # array of coordinates of field plane
-TARGET_WIDTH = 16.59128
-TARGET_HEIGHT = 8.211312
+TARGET_WIDTH = 16591.28
+TARGET_HEIGHT = 8211.312
 
 TARGET = np.array(
     [
@@ -26,17 +26,10 @@ TARGET = np.array(
     ]
 )  # array of coordinates of the target plane
 
-model = get_roboflow_model(model_id="frc-scouting-application/2", api_key=os.getenv('ROBOFLOW_API_KEY'))
+model = get_roboflow_model(model_id="frc-scouting-application/3", api_key=os.getenv('ROBOFLOW_API_KEY'))
 video_info = sv.VideoInfo.from_video_path(video_path="video.mp4")
 frames_generator = sv.get_video_frames_generator(source_path='video.mp4')
 tracker = sv.ByteTrack(frame_rate=video_info.fps)  # initiates tracker
-
-thickness = sv.calculate_optimal_line_thickness(resolution_wh=video_info.resolution_wh)
-text_scale = sv.calculate_optimal_text_scale(
-    resolution_wh=video_info.resolution_wh)
-# calculates optimal text scale and thickness for labels and other annotators
-
-# initiates all annotators
 
 class ViewTransformer:
     # class to pass all coordinates of SOURCE to opencv2 to transform it into a target plane
@@ -56,34 +49,19 @@ class ViewTransformer:
         transformed_points = cv2.perspectiveTransform(reshaped_points, self.m)
         return transformed_points.reshape(-1, 2)  # removes third dimension
 
-class ColorLookup:
-    def __init__(self, strategy='TRACK'):
-        self.strategy = strategy
-        self.colors = list(mcolors.TABLEAU_COLORS.values())  # Using predefined colors from Matplotlib
-        self.color_map = {}  # To store color associations
-
-    def get_color(self, key):
-        if self.strategy not in ['INDEX', 'CLASS', 'TRACK']:
-            raise ValueError(f"Invalid color lookup strategy: {self.strategy}")
-
-        # Use a consistent color for each unique key
-        if key not in self.color_map:
-            self.color_map[key] = self.colors[len(self.color_map) % len(self.colors)]
-        return self.color_map[key]
-
 class PointTracker:
-    def __init__(self, coordinates, color_strategy='TRACK'):
+    def __init__(self, coordinates):
         self.coordinates = coordinates
-        self.color_lookup = ColorLookup(strategy=color_strategy)
+        self.colors = {key: (random.random(), random.random(), random.random()) for key in coordinates.keys()}
 
-    def save_path_as_gif(self, filename='tracking_path2.gif', fps=30):
+    def save_path_as_gif(self, filename='tracking_path1.gif', fps=30):
         fig, ax = plt.subplots()
         all_x = [x for points in self.coordinates.values() for x, y in points]
         all_y = [y for points in self.coordinates.values() for x, y in points]
         ax.set_xlim(min(all_x) - 1, max(all_x) + 1)
         ax.set_ylim(min(all_y) - 1, max(all_y) + 1)
         points_plot, = ax.plot([], [], 'bo')
-        path_lines = {key: ax.plot([], [], linestyle='--', linewidth=0.5, color=self.color_lookup.get_color(key))[0] for key in self.coordinates.keys()}
+        path_lines = {key: ax.plot([], [], linestyle='--', linewidth=0.5, color=self.colors[key])[0] for key in self.coordinates.keys()}
 
         def init():
             points_plot.set_data([], [])
@@ -110,25 +88,32 @@ view_transformer = ViewTransformer(source=SOURCE, target=TARGET)
 
 coordinates = defaultdict(lambda: deque(maxlen=video_info.fps))  # keeps dictionary of historical point movement
 
-def callback(frame: np.ndarray, frame_idx: int) -> np.ndarray:
-    #function for callback to initiate frame analysis and prediction
-    results = model.infer(frame)[0]
-    detections = sv.Detections.from_inference(results)
-    detections = detections[polygon_zone.trigger(detections)]  # restricts detections to polygon zone
-    detections = tracker.update_with_detections(detections)  # associates trackers
+with sv.CSVSink("tracked.csv") as sink:
+    for frame_index, frame in enumerate(frames_generator):
+        result = model.infer(frame)[0]
+        detections = sv.Detections.from_inference(result)
+        detections = detections[polygon_zone.trigger(detections)]  # restricts detections to polygon zone  # associates trackers
 
-    points = detections.get_anchors_coordinates(
-        anchor=sv.Position.BOTTOM_CENTER)
-    points = view_transformer.transform_points(points=points).astype(int)  # relates points to distance
+        points = detections.get_anchors_coordinates(
+            anchor=sv.Position.BOTTOM_CENTER)
+        points = view_transformer.transform_points(points=points).astype(int)
 
-    for tracker_id, point in zip(detections.tracker_id, points):
-        coordinates[tracker_id].append(point)
+        for tracker_id, point in zip(detections.tracker_id, points):
+            coordinates[tracker_id].append(point)
+        
+        labels = []  # sets an empty label array
+        for tracker_id in detections.tracker_id:
+            coordinate_start = coordinates[tracker_id][-1]
+            coordinate_end = coordinates[tracker_id][0]
+            distance = abs(coordinate_start - coordinate_end)
+            time = len(coordinates[tracker_id]) / video_info.fps
+            speed = np.linalg.norm(distance) / (time * 1000)
+            labels.append(f"#{tracker_id} {float(speed)} ms^-1")
+        
+        sink.append(detections, {
+            "frame_index": frame_index,
+            "labels": labels,
+        })
 
-sv.process_video(
-    source_path="video.mp4",
-    target_path="resultc12.mp4",
-    callback=callback
-)
-
-tracker = PointTracker(coordinates, color_strategy='TRACK')
-tracker.save_path_as_gif(filename='tracking_path2.gif', fps=video_info.fps)
+tracker = PointTracker(coordinates)
+tracker.save_path_as_gif(filename='tracking_path1.gif', fps=video_info.fps)

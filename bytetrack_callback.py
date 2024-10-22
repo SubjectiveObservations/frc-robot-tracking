@@ -26,7 +26,7 @@ TARGET = np.array(
     ]
 )  # array of coordinates of the target plane
 
-model = get_roboflow_model(model_id="frc-scouting-application/3", api_key=os.getenv('ROBOFLOW_API_KEY'))
+model = get_roboflow_model(model_id="bumper-detection-b8q8f/4", api_key=os.getenv('ROBOFLOW_API_KEY'))
 video_info = sv.VideoInfo.from_video_path(video_path="video.mp4")
 frames_generator = sv.get_video_frames_generator(source_path='video.mp4')
 tracker = sv.ByteTrack(frame_rate=video_info.fps)  # initiates tracker
